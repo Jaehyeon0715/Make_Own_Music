@@ -205,6 +205,26 @@
     @media (max-width: 700px) {
       .track { grid-template-columns: 1fr; }
     }
+
+    /* plan loading bar */
+    .plan-loading {
+      height: 4px;
+      background: var(--line);
+      border-radius: 999px;
+      overflow: hidden;
+      margin-top: 10px;
+    }
+    .plan-loading .fill {
+      height: 100%;
+      width: 35%;
+      background: var(--accent);
+      border-radius: 999px;
+      animation: slide 1.4s ease-in-out infinite;
+    }
+    @keyframes slide {
+      0%   { transform: translateX(-100%); }
+      100% { transform: translateX(320%); }
+    }
   </style>
 </head>
 <body>
@@ -249,7 +269,9 @@
         <label>추가 지시
           <textarea name="prompt" placeholder="악기, 구조, 레퍼런스 느낌 등"></textarea>
         </label>
-        <button type="submit" class="btn-full">트랙 제안 →</button>
+        <button type="submit" class="btn-full">트랙 생성</button>
+        <div id="planLoading" class="plan-loading hidden"><div class="fill"></div></div>
+        <p id="planStatus" class="progress-text" style="margin-top:8px;font-size:13px;color:var(--muted)"></p>
       </form>
 
       <!-- 제안 결과 (폼 아래 인라인) -->
@@ -309,7 +331,9 @@
       <label>추가 지시
         <textarea name="prompt" placeholder="악기, 구조, 레퍼런스 느낌 등"></textarea>
       </label>
-      <button type="submit" class="btn-full">트랙 제안 →</button>
+      <button type="submit" class="btn-full">트랙 생성</button>
+      <div id="modalPlanLoading" class="plan-loading hidden"><div class="fill"></div></div>
+      <p id="modalPlanStatus" class="progress-text" style="margin-top:8px;font-size:13px;color:var(--muted)"></p>
     </form>
 
     <!-- 모달 제안 결과 -->
@@ -389,10 +413,18 @@
     body.duration = Number(body.duration || 30);
     body.bpm = body.bpm ? Number(body.bpm) : null;
     $(genBtnId).classList.add("hidden");
+    const loadingId = metaId === "planMeta" ? "planLoading" : "modalPlanLoading";
+    const statusId = metaId === "planMeta" ? "planStatus" : "modalPlanStatus";
+    $(loadingId).classList.remove("hidden");
+    $(statusId).textContent = "AI 답변 기다리는 중...";
     $(resultId).classList.add("hidden");
+    form.querySelector('button[type=submit]').disabled = true;
 
     const res = await api("/plan", { method: "POST", body: JSON.stringify(body) });
     const data = await res.json();
+    $(loadingId).classList.add("hidden");
+    $(statusId).textContent = "AI 답변 완료 ✓";
+    form.querySelector('button[type=submit]').disabled = false;
     setSession(data.session_id);
 
     $(metaId).textContent = `${data.plan.bpm} bpm · ${data.plan.key} · ${data.tracks.length} tracks`;
@@ -408,11 +440,15 @@
   /* ── Generate all (공통 로직) ── */
   async function generateAll(barId, textId, wrapId, genBtnId, onDone) {
     $(genBtnId).disabled = true;
+    const isModal = genBtnId === "modalGenerateBtn";
+    const statusId = isModal ? "modalPlanStatus" : "planStatus";
+    $(statusId).textContent = "트랙 생성 중...";
     const res = await api("/generate/all", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId })
     });
     await readStream(res, barId, textId, wrapId);
+    $(statusId).textContent = "생성 완료 ✓";
     $(genBtnId).disabled = false;
     onDone();
   }
