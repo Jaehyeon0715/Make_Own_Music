@@ -1,0 +1,582 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AI Composer</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --bg: #f6f4ef;
+      --ink: #202124;
+      --muted: #6f6a61;
+      --line: #d8d1c4;
+      --accent: #287c74;
+      --accent-2: #b44932;
+      --panel: #fffdf8;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: var(--bg);
+      color: var(--ink);
+    }
+
+    /* ─── Header ─── */
+    header {
+      height: 56px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0 24px;
+      border-bottom: 1px solid var(--line);
+      background: rgba(255,253,248,.92);
+      backdrop-filter: blur(6px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .provider-select {
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font: inherit;
+      font-size: 13px;
+      background: white;
+      color: var(--ink);
+      width: auto;
+      cursor: pointer;
+    }
+
+    /* ─── Common ─── */
+    h2, h3 { margin: 0; }
+    .status { margin: 4px 0 0; color: var(--muted); font-size: 13px; }
+    .hidden { display: none !important; }
+    .row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+    main { padding: 36px 20px 60px; }
+
+    /* ─── Page 1: Plan (centered single column) ─── */
+    #pagePlan { max-width: 580px; margin: 0 auto; }
+    .plan-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 28px 24px;
+    }
+    .plan-card h2 { font-size: 20px; margin-bottom: 20px; }
+    label { display: grid; gap: 6px; font-size: 13px; color: var(--muted); margin-bottom: 14px; }
+    input, textarea, select {
+      width: 100%;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      padding: 10px 11px;
+      font: inherit;
+      background: white;
+      color: var(--ink);
+    }
+    textarea { min-height: 80px; resize: vertical; }
+    button {
+      border: 0;
+      border-radius: 6px;
+      padding: 10px 14px;
+      background: var(--accent);
+      color: white;
+      font-weight: 700;
+      cursor: pointer;
+      font: inherit;
+    }
+    button.secondary { background: #e7e0d3; color: var(--ink); }
+    button.warn { background: var(--accent-2); }
+    button:disabled { opacity: .5; cursor: wait; }
+    .btn-full { width: 100%; padding: 13px; font-size: 15px; }
+
+    /* Plan results (used in both page1 and modal) */
+    .plan-meta { font-size: 13px; color: var(--muted); margin: 16px 0 10px; }
+    .plan-list { display: grid; gap: 8px; margin-bottom: 16px; }
+    .plan-item {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: white;
+      font-size: 13px;
+    }
+    .plan-item strong { display: block; margin-bottom: 3px; font-size: 14px; }
+    .progress {
+      height: 8px;
+      background: #e3ddd2;
+      border-radius: 999px;
+      overflow: hidden;
+      margin-bottom: 6px;
+    }
+    .bar { height: 100%; width: 0%; background: var(--accent); transition: width .25s ease; }
+    .progress-text { font-size: 12px; color: var(--muted); margin-bottom: 12px; min-height: 16px; }
+    .divider { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
+
+    /* ─── Page 2: DAW ─── */
+    #pageDaw { max-width: 1100px; margin: 0 auto; }
+    .daw-card {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      padding: 22px 24px;
+    }
+    .daw-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 18px;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .track {
+      display: grid;
+      grid-template-columns: 170px 1fr 200px;
+      gap: 14px;
+      align-items: start;
+      padding: 14px 0;
+      border-bottom: 1px solid var(--line);
+    }
+    .track:last-child { border-bottom: 0; }
+    .track h3 { font-size: 15px; margin-bottom: 4px; }
+    .track p { margin: 0; color: var(--muted); font-size: 13px; }
+    canvas {
+      width: 100%;
+      height: 76px;
+      background: #ebe6dc;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      display: block;
+    }
+    audio { width: 100%; }
+    .repaint-form {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+      margin-top: 8px;
+      flex-wrap: wrap;
+      background: #f0ebe1;
+      border-radius: 6px;
+      padding: 8px;
+    }
+    .repaint-form label { margin: 0; font-size: 12px; display: flex; align-items: center; gap: 4px; }
+    .repaint-form input[type=number] { width: 66px; padding: 5px 7px; font-size: 12px; }
+    .repaint-form button { padding: 6px 10px; font-size: 12px; }
+
+    /* ─── Modal ─── */
+    .modal-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.45);
+      z-index: 30;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .modal-card {
+      background: var(--panel);
+      border-radius: 12px;
+      padding: 28px 24px 24px;
+      width: min(560px, 100%);
+      max-height: 88vh;
+      overflow-y: auto;
+      position: relative;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    .modal-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+    .modal-head h2 { font-size: 18px; }
+    .modal-close {
+      background: none;
+      color: var(--muted);
+      font-size: 20px;
+      padding: 4px 8px;
+      line-height: 1;
+      font-weight: 400;
+    }
+    .modal-close:hover { background: #e7e0d3; color: var(--ink); }
+
+    @media (max-width: 700px) {
+      .track { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <strong>AI Composer</strong>
+  <div class="header-right">
+    <select id="providerSelect" class="provider-select" title="AI Provider">
+      <option value="ollama">Ollama</option>
+      <option value="claude">Claude</option>
+      <option value="openai">OpenAI</option>
+      <option value="gemini">Gemini</option>
+    </select>
+    <span id="sessionBadge" class="status"></span>
+  </div>
+</header>
+
+<main>
+
+  <!-- ══════════ PAGE 1: 기획 ══════════ -->
+  <section id="pagePlan">
+    <div class="plan-card">
+      <h2>트랙 기획</h2>
+      <form id="planForm">
+        <label>장르
+          <input name="genre" placeholder="예: city pop, lo-fi jazz" required />
+        </label>
+        <label>분위기
+          <input name="mood" placeholder="예: 밤 드라이브, 차분한 긴장감" required />
+        </label>
+        <div class="row">
+          <label style="flex:1">BPM
+            <input name="bpm" type="number" min="40" max="240" placeholder="auto" />
+          </label>
+          <label style="flex:1">Key
+            <input name="key" placeholder="auto" />
+          </label>
+        </div>
+        <label>길이(초)
+          <input name="duration" type="number" min="5" max="600" value="30" />
+        </label>
+        <label>추가 지시
+          <textarea name="prompt" placeholder="악기, 구조, 레퍼런스 느낌 등"></textarea>
+        </label>
+        <button type="submit" class="btn-full">트랙 제안 →</button>
+      </form>
+
+      <!-- 제안 결과 (폼 아래 인라인) -->
+      <div id="planResult" class="hidden">
+        <hr class="divider" />
+        <div id="planMeta" class="plan-meta"></div>
+        <div id="planList" class="plan-list"></div>
+        <div class="progress hidden" id="progressWrap1"><div id="progressBar1" class="bar"></div></div>
+        <p id="progressText1" class="progress-text"></p>
+        <button id="generateBtn" class="warn btn-full">🎼 생성 시작</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- ══════════ PAGE 2: DAW ══════════ -->
+  <section id="pageDaw" class="hidden">
+    <div class="daw-card">
+      <div class="daw-header">
+        <h2>DAW 편집</h2>
+        <div class="row">
+          <button id="editPlanBtn" class="secondary">기획 수정</button>
+          <button id="mixBtn">믹스 만들기</button>
+          <a id="mixLink" class="status" href="#" download style="font-size:13px"></a>
+        </div>
+      </div>
+      <div id="tracks"></div>
+    </div>
+  </section>
+
+</main>
+
+<!-- ══════════ MODAL: 기획 수정 팝업 ══════════ -->
+<div id="modal" class="modal-overlay hidden">
+  <div class="modal-card">
+    <div class="modal-head">
+      <h2>기획 수정</h2>
+      <button class="modal-close" id="modalClose">✕</button>
+    </div>
+    <form id="modalPlanForm">
+      <label>장르
+        <input name="genre" placeholder="예: city pop, lo-fi jazz" required />
+      </label>
+      <label>분위기
+        <input name="mood" placeholder="예: 밤 드라이브, 차분한 긴장감" required />
+      </label>
+      <div class="row">
+        <label style="flex:1">BPM
+          <input name="bpm" type="number" min="40" max="240" placeholder="auto" />
+        </label>
+        <label style="flex:1">Key
+          <input name="key" placeholder="auto" />
+        </label>
+      </div>
+      <label>길이(초)
+        <input name="duration" type="number" min="5" max="600" value="30" />
+      </label>
+      <label>추가 지시
+        <textarea name="prompt" placeholder="악기, 구조, 레퍼런스 느낌 등"></textarea>
+      </label>
+      <button type="submit" class="btn-full">트랙 제안 →</button>
+    </form>
+
+    <!-- 모달 제안 결과 -->
+    <div id="modalPlanResult" class="hidden">
+      <hr class="divider" />
+      <div id="modalPlanMeta" class="plan-meta"></div>
+      <div id="modalPlanList" class="plan-list"></div>
+      <div class="progress hidden" id="progressWrap2"><div id="progressBar2" class="bar"></div></div>
+      <p id="progressText2" class="progress-text"></p>
+      <button id="modalGenerateBtn" class="warn btn-full">🎼 생성 시작</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  let sessionId = localStorage.getItem("session_id") || "";
+
+  /* ── API helper ── */
+  function api(path, opts = {}) {
+    return fetch(path, {
+      ...opts,
+      headers: { "Content-Type": "application/json", ...(opts.headers || {}) }
+    });
+  }
+
+  /* ── Session ── */
+  function setSession(sid) {
+    sessionId = sid;
+    if (sid) localStorage.setItem("session_id", sid);
+    $("sessionBadge").textContent = sid ? `session ${sid.slice(0, 8)}` : "";
+  }
+
+  /* ── Page switch ── */
+  function showPage(name) {
+    $("pagePlan").classList.toggle("hidden", name !== "plan");
+    $("pageDaw").classList.toggle("hidden", name !== "daw");
+  }
+
+  /* ── Modal ── */
+  function openModal()  { $("modal").classList.remove("hidden"); }
+  function closeModal() { $("modal").classList.add("hidden"); }
+  $("modalClose").addEventListener("click", closeModal);
+  $("modal").addEventListener("click", e => { if (e.target === $("modal")) closeModal(); });
+  document.addEventListener("keydown", e => { if (e.key === "Escape") closeModal(); });
+
+  /* ── SSE stream reader ── */
+  async function readStream(res, barId, textId, wrapId) {
+    $(wrapId).classList.remove("hidden");
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const chunks = buf.split("\n\n");
+      buf = chunks.pop();
+      for (const chunk of chunks) {
+        const line = chunk.split("\n").find(x => x.startsWith("data: "));
+        if (!line) continue;
+        const ev = JSON.parse(line.slice(6));
+        if (ev.percent !== undefined) {
+          $(barId).style.width = `${ev.percent}%`;
+          $(textId).textContent = ev.track_name ? `${ev.track_name} ${ev.percent}%` : `${ev.percent}%`;
+        } else {
+          $(textId).textContent = ev.message || ev.type || "";
+        }
+      }
+    }
+  }
+
+  /* ── Plan form submit (공통 로직) ── */
+  async function submitPlan(form, metaId, listId, resultId, genBtnId) {
+    const fd = new FormData(form);
+    const body = Object.fromEntries(fd.entries());
+    body.duration = Number(body.duration || 30);
+    body.bpm = body.bpm ? Number(body.bpm) : null;
+    $(genBtnId).classList.add("hidden");
+    $(resultId).classList.add("hidden");
+
+    const res = await api("/plan", { method: "POST", body: JSON.stringify(body) });
+    const data = await res.json();
+    setSession(data.session_id);
+
+    $(metaId).textContent = `${data.plan.bpm} bpm · ${data.plan.key} · ${data.tracks.length} tracks`;
+    $(listId).innerHTML = data.tracks.map(t => `
+      <div class="plan-item">
+        <strong>${t.track_order}. ${t.name} / ${t.instrument}</strong>
+        <span>${t.caption}</span>
+      </div>`).join("");
+    $(resultId).classList.remove("hidden");
+    $(genBtnId).classList.remove("hidden");
+  }
+
+  /* ── Generate all (공통 로직) ── */
+  async function generateAll(barId, textId, wrapId, genBtnId, onDone) {
+    $(genBtnId).disabled = true;
+    const res = await api("/generate/all", {
+      method: "POST",
+      body: JSON.stringify({ session_id: sessionId })
+    });
+    await readStream(res, barId, textId, wrapId);
+    $(genBtnId).disabled = false;
+    onDone();
+  }
+
+  /* ── Waveform ── */
+  function drawWave(canvas, peaks) {
+    const ctx = canvas.getContext("2d");
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.scale(dpr, dpr);
+    ctx.clearRect(0, 0, rect.width, rect.height);
+    ctx.strokeStyle = "#287c74";
+    ctx.lineWidth = 1;
+    const mid = rect.height / 2;
+    peaks.forEach((v, i) => {
+      const x = (i / peaks.length) * rect.width;
+      const h = v * rect.height * .46;
+      ctx.beginPath(); ctx.moveTo(x, mid - h); ctx.lineTo(x, mid + h); ctx.stroke();
+    });
+  }
+
+  /* ── Render DAW tracks ── */
+  async function renderTracks() {
+    const res = await api(`/session/${sessionId}`);
+    const data = await res.json();
+    $("tracks").innerHTML = data.tracks.map(t => `
+      <div class="track">
+        <div>
+          <h3>${t.track_order}. ${t.name}</h3>
+          <p>${t.instrument}</p>
+        </div>
+        <canvas id="wave-${t.track_order}"></canvas>
+        <div>
+          ${t.wav_url
+            ? `<audio controls src="${t.wav_url}" style="margin-bottom:8px"></audio>`
+            : `<p class="status" style="margin-bottom:8px">생성 전</p>`}
+          <label style="margin-bottom:8px">볼륨
+            <input type="range" min="0" max="2" step="0.01" value="${t.volume}" data-volume="${t.track_order}" />
+          </label>
+          <div class="row">
+            <button class="secondary" data-regen="${t.track_order}">재생성</button>
+            <button class="secondary" data-repaint-toggle="${t.track_order}">Repaint ▾</button>
+          </div>
+          <div id="repaint-form-${t.track_order}" class="repaint-form hidden">
+            <label>시작(s)<input type="number" id="rs-${t.track_order}" min="0" step="0.1" value="0" /></label>
+            <label>끝(s)<input type="number" id="re-${t.track_order}" min="0" step="0.1" value="5" /></label>
+            <button data-repaint="${t.track_order}" class="warn">실행</button>
+          </div>
+        </div>
+      </div>`).join("");
+
+    for (const t of data.tracks) {
+      if (!t.wav_url) continue;
+      const wf = await fetch(`/waveform/${sessionId}/${t.track_order}`).then(r => r.ok ? r.json() : null);
+      if (wf) drawWave($(`wave-${t.track_order}`), wf.peaks);
+    }
+  }
+
+  /* ══════════ EVENT HANDLERS ══════════ */
+
+  /* Provider switch */
+  $("providerSelect").addEventListener("change", async e => {
+    e.target.disabled = true;
+    await api("/provider/switch", { method: "POST", body: JSON.stringify({ provider: e.target.value }) })
+      .then(r => readStream(r, "progressBar1", "progressText1", "progressWrap1"))
+      .catch(() => {});
+    e.target.disabled = false;
+  });
+
+  /* Page 1 plan form */
+  $("planForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    await submitPlan(e.currentTarget, "planMeta", "planList", "planResult", "generateBtn");
+  });
+
+  /* Page 1 generate */
+  $("generateBtn").addEventListener("click", () => {
+    generateAll("progressBar1", "progressText1", "progressWrap1", "generateBtn", async () => {
+      showPage("daw");
+      await renderTracks();
+    });
+  });
+
+  /* 기획 수정 버튼 → modal open */
+  $("editPlanBtn").addEventListener("click", () => {
+    $("modalPlanResult").classList.add("hidden");
+    $("modalGenerateBtn").classList.add("hidden");
+    openModal();
+  });
+
+  /* Modal plan form */
+  $("modalPlanForm").addEventListener("submit", async e => {
+    e.preventDefault();
+    await submitPlan(e.currentTarget, "modalPlanMeta", "modalPlanList", "modalPlanResult", "modalGenerateBtn");
+  });
+
+  /* Modal generate */
+  $("modalGenerateBtn").addEventListener("click", () => {
+    generateAll("progressBar2", "progressText2", "progressWrap2", "modalGenerateBtn", async () => {
+      closeModal();
+      await renderTracks();
+    });
+  });
+
+  /* DAW: volume / regen / repaint */
+  $("tracks").addEventListener("input", async e => {
+    const order = e.target.dataset.volume;
+    if (!order) return;
+    await api(`/track/${sessionId}/${order}/volume`, {
+      method: "POST",
+      body: JSON.stringify({ volume: Number(e.target.value) })
+    });
+  });
+
+  $("tracks").addEventListener("click", async e => {
+    const regen = e.target.dataset.regen;
+    const toggle = e.target.dataset.repaintToggle;
+    const repaint = e.target.dataset.repaint;
+
+    if (toggle) {
+      $(`repaint-form-${toggle}`).classList.toggle("hidden");
+    }
+    if (regen) {
+      e.target.disabled = true;
+      const res = await api(`/generate/track/${sessionId}/${regen}`, { method: "POST", body: "{}" });
+      await readStream(res, "progressBar1", "progressText1", "progressWrap1");
+      e.target.disabled = false;
+      await renderTracks();
+    }
+    if (repaint) {
+      const start = Number($(`rs-${repaint}`).value || 0);
+      const end   = Number($(`re-${repaint}`).value || 5);
+      if (end <= start) { alert("끝(s) > 시작(s) 이어야 합니다."); return; }
+      e.target.disabled = true;
+      const res = await api("/repaint", {
+        method: "POST",
+        body: JSON.stringify({ session_id: sessionId, track_order: Number(repaint), start_sec: start, end_sec: end })
+      });
+      await readStream(res, "progressBar1", "progressText1", "progressWrap1");
+      e.target.disabled = false;
+      $(`repaint-form-${repaint}`).classList.add("hidden");
+      await renderTracks();
+    }
+  });
+
+  /* Mix */
+  $("mixBtn").addEventListener("click", async () => {
+    $("mixBtn").disabled = true;
+    const res = await api(`/mix/${sessionId}`, { method: "POST", body: "{}" });
+    const data = await res.json();
+    $("mixLink").href = data.latest_mp3_url;
+    $("mixLink").textContent = `⬇ mix_v${data.version}.mp3`;
+    $("mixBtn").disabled = false;
+  });
+
+  /* ── Restore session on load ── */
+  if (sessionId) {
+    setSession(sessionId);
+    fetch(`/session/${sessionId}`).then(async r => {
+      if (r.ok) { showPage("daw"); await renderTracks(); }
+    });
+  }
+</script>
+</body>
+</html>

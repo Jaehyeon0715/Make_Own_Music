@@ -1,0 +1,19 @@
+# Environment
+backend/.env
+
+# Database and generated audio
+sessions.db
+backend/sessions.db
+outputs/
+backend/outputs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+
+# OS / logs
+.DS_Store
+*.log

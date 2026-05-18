@@ -1,0 +1,27 @@
+# ── AI Provider ───────────────────────────────────────────
+# 사용할 Provider 선택: claude | openai | gemini | ollama
+AI_PROVIDER=ollama
+
+# ── API Keys (사용하는 Provider 것만 입력) ─────────────────
+CLAUDE_API_KEY=sk-ant-xxxxxx
+OPENAI_API_KEY=sk-xxxxxx
+GEMINI_API_KEY=AIzaxxxxxx
+OLLAMA_HOST=http://localhost:11434  # Ollama 사용 시 주석 해제
+
+# ── ACE-Step 서버 ──────────────────────────────────────────
+ACESTEP_URL=http://localhost:8001
+
+# ── 서버 보안 ──────────────────────────────────────────────
+# X-API-Key 헤더 인증 (미설정 시 인증 비활성화)
+API_KEY=your-secret-key-here
+
+# ── DB / 파일 경로 ─────────────────────────────────────────
+DB_PATH=sessions.db
+OUTPUTS_DIR=outputs
+
+# ── CORS ───────────────────────────────────────────────────
+CORS_ORIGINS=["http://localhost:8000","http://127.0.0.1:8000"]
+
+# ── 세션 설정 ──────────────────────────────────────────────
+SESSION_TTL_HOURS=24
+MAX_MIX_VERSIONS=10
