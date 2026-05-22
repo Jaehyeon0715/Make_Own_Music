@@ -10,7 +10,8 @@ from typing import List, Optional
 import httpx
 
 ACESTEP_URL = os.getenv("ACESTEP_URL", "http://localhost:8001")
-_TIMEOUT = 600.0  # Generation can take several minutes.
+# Default 30 min — CPU VAE fallback on low-VRAM systems can take very long.
+_TIMEOUT = float(os.getenv("ACESTEP_CLIENT_TIMEOUT", "1800"))
 _CONNECT_TIMEOUT = 10.0
 
 _cached_model_id: Optional[str] = None
@@ -67,6 +68,13 @@ async def _get_model_id() -> str:
     global _cached_model_id
     if _cached_model_id:
         return _cached_model_id
+
+    # Explicit env override wins.
+    override = os.getenv("ACESTEP_MODEL")
+    if override:
+        _cached_model_id = override if "/" in override else f"acestep/{override}"
+        return _cached_model_id
+
     try:
         data = await _get("/health", timeout=_CONNECT_TIMEOUT)
         # wrap_response may nest data under "data" key
@@ -77,10 +85,8 @@ async def _get_model_id() -> str:
             return _cached_model_id
     except Exception:
         pass
-    # Fallback — works with the ACE-Step 1.5 base checkpoint
-    _cached_model_id = os.getenv(
-        "ACESTEP_MODEL", "ACE-Step-v1.5-vocal-instruction"
-    )
+    # Final fallback — most installs ship with the turbo checkpoint.
+    _cached_model_id = "acestep/acestep-v15-turbo"
     return _cached_model_id
 
 

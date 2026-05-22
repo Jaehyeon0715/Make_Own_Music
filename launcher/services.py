@@ -114,10 +114,13 @@ def init_acestep_model(timeout: int = config.INIT_TIMEOUT_SEC) -> bool:
 # ── Service factories ────────────────────────────────────────────────────────
 
 def make_acestep() -> Service:
+    # Increase ACE-Step generation timeout; default 600s is too short on
+    # low-VRAM systems where VAE decode falls back to CPU.
     return Service(
         name="acestep",
         cmd=[config.UV_PATH, "run", "acestep-api"],
         cwd=config.ACE_STEP_DIR,
+        env={"ACESTEP_GENERATION_TIMEOUT": "1800"},
     )
 
 
