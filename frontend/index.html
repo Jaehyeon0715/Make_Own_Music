@@ -386,6 +386,7 @@
     const reader = res.body.getReader();
     const dec = new TextDecoder();
     let buf = "";
+    let result = { ok: true, message: "" };
     while (true) {
       const { value, done } = await reader.read();
       if (done) break;
@@ -396,14 +397,31 @@
         const line = chunk.split("\n").find(x => x.startsWith("data: "));
         if (!line) continue;
         const ev = JSON.parse(line.slice(6));
-        if (ev.percent !== undefined) {
+        if (ev.type === "error") {
+          result.ok = false;
+          result.message = ev.message || "Unknown error";
+          $(textId).textContent = "⚠ " + result.message;
+          $(textId).style.color = "#b44932";
+        } else if (ev.type === "done") {
+          if (ev.status === "error" || ev.status === "partial") {
+            result.ok = ev.status !== "error";
+            result.message = ev.message || "";
+            $(textId).textContent = (ev.status === "error" ? "⚠ 모든 트랙 실패: " : "일부 실패: ") + result.message;
+            $(textId).style.color = "#b44932";
+          } else {
+            $(textId).textContent = "완료";
+            $(textId).style.color = "";
+          }
+        } else if (ev.percent !== undefined) {
           $(barId).style.width = `${ev.percent}%`;
           $(textId).textContent = ev.track_name ? `${ev.track_name} ${ev.percent}%` : `${ev.percent}%`;
+          $(textId).style.color = "";
         } else {
           $(textId).textContent = ev.message || ev.type || "";
         }
       }
     }
+    return result;
   }
 
   /* ── Plan form submit (공통 로직) ── */
@@ -417,14 +435,36 @@
     const statusId = metaId === "planMeta" ? "planStatus" : "modalPlanStatus";
     $(loadingId).classList.remove("hidden");
     $(statusId).textContent = "AI 답변 기다리는 중...";
+    $(statusId).style.color = "";
     $(resultId).classList.add("hidden");
     form.querySelector('button[type=submit]').disabled = true;
 
-    const res = await api("/plan", { method: "POST", body: JSON.stringify(body) });
-    const data = await res.json();
+    let res, data;
+    try {
+      res = await api("/plan", { method: "POST", body: JSON.stringify(body) });
+      data = await res.json();
+    } catch (e) {
+      $(loadingId).classList.add("hidden");
+      $(statusId).textContent = "⚠ 네트워크 오류: " + e.message;
+      $(statusId).style.color = "#b44932";
+      form.querySelector('button[type=submit]').disabled = false;
+      return;
+    }
     $(loadingId).classList.add("hidden");
-    $(statusId).textContent = "AI 답변 완료 ✓";
     form.querySelector('button[type=submit]').disabled = false;
+
+    if (!res.ok) {
+      $(statusId).textContent = `⚠ ${res.status} ${data.detail || res.statusText}`;
+      $(statusId).style.color = "#b44932";
+      return;
+    }
+    if (!data.session_id || !data.plan || !data.tracks) {
+      $(statusId).textContent = "⚠ 잘못된 응답 형식";
+      $(statusId).style.color = "#b44932";
+      return;
+    }
+
+    $(statusId).textContent = "AI 답변 완료 ✓";
     setSession(data.session_id);
 
     $(metaId).textContent = `${data.plan.bpm} bpm · ${data.plan.key} · ${data.tracks.length} tracks`;
@@ -442,15 +482,28 @@
     $(genBtnId).disabled = true;
     const isModal = genBtnId === "modalGenerateBtn";
     const statusId = isModal ? "modalPlanStatus" : "planStatus";
-    $(statusId).textContent = "트랙 생성 중...";
+    $(statusId).textContent = "트랙 생성 중... (수 분 소요)";
+    $(statusId).style.color = "";
     const res = await api("/generate/all", {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId })
     });
-    await readStream(res, barId, textId, wrapId);
-    $(statusId).textContent = "생성 완료 ✓";
+    if (!res.ok) {
+      const detail = await res.text();
+      $(statusId).textContent = `⚠ ${res.status}: ${detail.slice(0, 200)}`;
+      $(statusId).style.color = "#b44932";
+      $(genBtnId).disabled = false;
+      return;
+    }
+    const result = await readStream(res, barId, textId, wrapId);
     $(genBtnId).disabled = false;
-    onDone();
+    if (result.ok) {
+      $(statusId).textContent = "생성 완료 ✓";
+      onDone();
+    } else {
+      $(statusId).textContent = "⚠ " + result.message;
+      $(statusId).style.color = "#b44932";
+    }
   }
 
   /* ── Waveform ── */
@@ -610,7 +663,19 @@
   if (sessionId) {
     setSession(sessionId);
     fetch(`/session/${sessionId}`).then(async r => {
-      if (r.ok) { showPage("daw"); await renderTracks(); }
+      if (r.ok) {
+        showPage("daw");
+        await renderTracks();
+      } else {
+        // Stale session — clear localStorage so user starts fresh.
+        localStorage.removeItem("session_id");
+        sessionId = "";
+        setSession("");
+      }
+    }).catch(() => {
+      localStorage.removeItem("session_id");
+      sessionId = "";
+      setSession("");
     });
   }
 </script>

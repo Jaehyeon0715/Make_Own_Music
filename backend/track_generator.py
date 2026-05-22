@@ -27,6 +27,7 @@ async def generate_all(
     global_key = session["key"] or "C major"
     total = len(tracks)
     generated_paths: list[str] = []
+    failures: list[str] = []
 
     for idx, track in enumerate(tracks):
         order = track["track_order"]
@@ -50,6 +51,7 @@ async def generate_all(
 
         # First track starts from text; later tracks reference previous WAVs.
         success = False
+        last_err: str = ""
         for attempt in range(2):
             try:
                 if idx == 0:
@@ -64,29 +66,49 @@ async def generate_all(
                 success = True
                 break
             except Exception as e:
+                last_err = f"{type(e).__name__}: {e}"
+                print(f"[track_generator] track {order} attempt {attempt + 1} failed: {last_err}")
                 if attempt == 0:
                     await sse_queue.put(_sse(
                         "error",
                         track_order=order,
-                        message=f"Track {order} generation failed, retrying. ({e})",
+                        message=f"Track {order} failed, retrying. {last_err}",
                     ))
                     await asyncio.sleep(1)
-                else:
-                    await sse_queue.put(_sse(
-                        "error",
-                        track_order=order,
-                        message=f"Track {order} generation failed permanently: {e}",
-                    ))
 
         if success:
             wav_url = f"/outputs/{session_id}/track_{order}.wav"
             await db.update_track_wav(session_id, order, wav_url)
             generated_paths.append(out_path)
+        else:
+            failures.append(f"#{order} {track['name']}: {last_err}")
+            await sse_queue.put(_sse(
+                "error",
+                track_order=order,
+                message=f"Track {order} permanently failed: {last_err}",
+            ))
 
     # Final event lets the SSE route close cleanly.
-    await db.update_session_status(session_id, "done")
-    updated_tracks = await db.get_tracks(session_id)
-    await sse_queue.put(_sse("done", percent=100, tracks=updated_tracks))
+    if failures and not generated_paths:
+        # All tracks failed — session is in error state.
+        await db.update_session_status(session_id, "error")
+        await sse_queue.put(_sse(
+            "done",
+            percent=100,
+            status="error",
+            message="All tracks failed. " + " | ".join(failures),
+            tracks=await db.get_tracks(session_id),
+        ))
+    else:
+        status = "done" if not failures else "partial"
+        await db.update_session_status(session_id, status)
+        await sse_queue.put(_sse(
+            "done",
+            percent=100,
+            status=status,
+            message=(" | ".join(failures) if failures else "OK"),
+            tracks=await db.get_tracks(session_id),
+        ))
 
 
 async def regenerate_track(

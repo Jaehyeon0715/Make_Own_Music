@@ -120,27 +120,36 @@ async def health():
 @app.post("/plan", dependencies=[Depends(require_api_key)])
 async def plan(req: PlanRequest):
     # Planning creates a session immediately so generation can resume later.
-    provider = factory.get_provider()
-    result = await provider.plan_tracks(
-        genre=req.genre,
-        mood=req.mood,
-        bpm=req.bpm,
-        key=req.key,
-        duration=req.duration,
-        prompt=req.prompt,
-    )
+    try:
+        provider = factory.get_provider()
+        result = await provider.plan_tracks(
+            genre=req.genre,
+            mood=req.mood,
+            bpm=req.bpm,
+            key=req.key,
+            duration=req.duration,
+            prompt=req.prompt,
+        )
+    except Exception as e:
+        print(f"[/plan] provider error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=502, detail=f"AI provider failed: {e}")
+
     session_id = uuid.uuid4().hex
     tracks = _track_dicts(result)
-    await db.create_session(
-        session_id=session_id,
-        ai_provider=os.getenv("AI_PROVIDER", "ollama"),
-        duration=req.duration,
-        bpm=result.bpm,
-        bpm_auto=int(result.bpm_auto),
-        key=result.key,
-        key_auto=int(result.key_auto),
-    )
-    await db.create_tracks(session_id, tracks)
+    try:
+        await db.create_session(
+            session_id=session_id,
+            ai_provider=os.getenv("AI_PROVIDER", "ollama"),
+            duration=req.duration,
+            bpm=result.bpm,
+            bpm_auto=int(result.bpm_auto),
+            key=result.key,
+            key_auto=int(result.key_auto),
+        )
+        await db.create_tracks(session_id, tracks)
+    except Exception as e:
+        print(f"[/plan] db error: {type(e).__name__}: {e}")
+        raise HTTPException(status_code=500, detail=f"DB error: {e}")
     return {"session_id": session_id, "plan": result.model_dump(), "tracks": await db.get_tracks(session_id)}
 
 

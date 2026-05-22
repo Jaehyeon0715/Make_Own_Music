@@ -21,14 +21,16 @@ _cached_model_id: Optional[str] = None
 async def _get(path: str, timeout: float = 30.0) -> dict:
     async with httpx.AsyncClient(timeout=timeout) as c:
         r = await c.get(f"{ACESTEP_URL}{path}")
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise RuntimeError(f"ACE-Step GET {path} -> {r.status_code}: {r.text[:400]}")
         return r.json()
 
 
 async def _post(path: str, payload: dict, timeout: float = _TIMEOUT) -> dict:
     async with httpx.AsyncClient(timeout=timeout) as c:
         r = await c.post(f"{ACESTEP_URL}{path}", json=payload)
-        r.raise_for_status()
+        if r.status_code >= 400:
+            raise RuntimeError(f"ACE-Step POST {path} -> {r.status_code}: {r.text[:400]}")
         return r.json()
 
 
