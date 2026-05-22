@@ -17,3 +17,10 @@ venv/
 # OS / logs
 .DS_Store
 *.log
+logs/
+
+# PyInstaller build artifacts
+build/
+dist/
+*.spec
+launcher/icon.ico
