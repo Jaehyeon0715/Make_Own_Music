@@ -1,0 +1,12 @@
+# Demucs post-hoc stem separation (optional - only needed for /generate/separated).
+# Pulls in torch (large). Install into the same env that runs the FastAPI backend:
+#   pip install -r requirements-demucs.txt
+# GPU: install a CUDA torch build first, then set DEMUCS_DEVICE=cuda in .env.
+# After installing, pre-download the model weights so the first separation
+# request doesn't stall on a ~hundreds-MB download:
+#   python -m backend.prefetch_demucs
+demucs>=4.0.0
+# soundfile gives torchaudio a WAV read/write backend on Windows (torchaudio
+# 2.x ships none). Without it demucs fails to load the input: "Couldn't find
+# appropriate backend" / "FFmpeg is not installed".
+soundfile>=0.12.0

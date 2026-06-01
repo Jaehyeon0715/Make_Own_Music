@@ -168,6 +168,16 @@ async def create_tracks(session_id: str, tracks: list[dict]) -> None:
         await db.commit()
 
 
+async def clear_tracks(session_id: str) -> None:
+    """Delete all tracks for a session, keeping the session row intact.
+
+    Used when stem separation replaces the planned track list with real stems.
+    """
+    async with aiosqlite.connect(DB_PATH) as db:
+        await db.execute("DELETE FROM tracks WHERE session_id = ?", (session_id,))
+        await db.commit()
+
+
 async def get_tracks(session_id: str) -> list[dict]:
     async with aiosqlite.connect(DB_PATH) as db:
         db.row_factory = aiosqlite.Row

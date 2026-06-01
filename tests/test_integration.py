@@ -201,3 +201,37 @@ async def test_s6_provider_switch(client):
 
     # factory 실제 전환 확인
     assert factory._current_provider is not None
+
+
+# ══════════════════════════════════════════════════════════════
+# Scenario 7 — 스템 분리 생성 (Demucs 사후 분리)
+# /generate/separated → 전체 곡 생성 → Demucs → drums/bass/other 트랙
+# ══════════════════════════════════════════════════════════════
+
+async def test_s7_separated_generation(client, ace_mock, provider_mock, demucs_mock):
+    from backend import db
+    from backend.config import OUTPUTS_DIR
+
+    plan_res = await client.post("/plan", json={"genre": "funk", "mood": "groovy", "duration": 10})
+    sid = plan_res.json()["session_id"]
+
+    events = []
+    async with client.stream("POST", "/generate/separated", json={"session_id": sid}) as r:
+        assert r.status_code == 200
+        events = await collect_sse(r)
+
+    done = [e for e in events if e.get("type") == "done"]
+    assert done, f"'done' SSE 없음. 수신: {events}"
+    assert done[0]["status"] == "done", f"분리 실패: {done[0]}"
+
+    # 계획 트랙 → 실제 스템으로 교체됨
+    tracks = await db.get_tracks(sid)
+    assert {t["instrument"] for t in tracks} == {"drums", "bass", "other"}
+    for t in tracks:
+        assert t["wav_url"], f"track {t['track_order']} wav_url 없음"
+        wav = OUTPUTS_DIR / sid / f"track_{t['track_order']}.wav"
+        assert wav.exists(), f"{wav} 파일 없음"
+
+    # 없는 세션 → 404
+    missing = await client.post("/generate/separated", json={"session_id": "nope_xyz"})
+    assert missing.status_code == 404

@@ -101,6 +101,21 @@ def ace_mock():
 
 
 @pytest.fixture
+def demucs_mock():
+    """Demucs 호출 대신 3개 스템 더미 WAV 생성."""
+    async def fake_separate(input_wav, out_dir):
+        results = []
+        for stem in ("drums", "bass", "other"):
+            p = Path(out_dir) / "htdemucs" / f"{stem}.wav"
+            make_wav(p)
+            results.append({"stem": stem, "path": str(p)})
+        return results
+
+    with patch("backend.stem_separator.separate", side_effect=fake_separate):
+        yield
+
+
+@pytest.fixture
 def mp3_mock():
     """ffmpeg 미설치 환경에서 MP3 export를 빈 파일로 대체."""
     from pathlib import Path

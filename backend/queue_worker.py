@@ -15,6 +15,7 @@ class Priority(IntEnum):
 
 class TaskType:
     GENERATE = "GENERATE"
+    SEPARATE = "SEPARATE"
     REGENERATE = "REGENERATE"
     REPAINT = "REPAINT"
     SWITCH_PROVIDER = "SWITCH_PROVIDER"

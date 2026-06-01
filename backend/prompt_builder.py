@@ -19,6 +19,18 @@ def build_caption(
     return f"{caption}, {bpm} bpm, {key}, no vocals"
 
 
+def build_master_caption(tracks: list[dict], global_bpm: int, global_key: str) -> str:
+    """Build a single full-band caption for stem-separation generation.
+
+    Combines the planned tracks into one cohesive prompt: the richest caption
+    sets the style, the instrument list fills out the arrangement.
+    """
+    instruments = ", ".join(t["instrument"] for t in tracks if t.get("instrument"))
+    descriptor = max((t.get("caption", "") for t in tracks), key=len, default="")
+    body = "; ".join(p for p in (descriptor, instruments) if p)
+    return f"{body}, {global_bpm} bpm, {global_key}, no vocals"
+
+
 def build_captions_for_session(tracks: list[dict], global_bpm: int, global_key: str) -> list[str]:
     """Build final captions for all tracks in order."""
     return [

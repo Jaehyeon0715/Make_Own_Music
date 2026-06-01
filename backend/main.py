@@ -19,7 +19,7 @@ from . import ace_client, db, mixer, session_manager
 from .ai_provider import factory
 from .config import FRONTEND_DIR, OUTPUTS_DIR, configure_cors, require_api_key
 from .queue_worker import Priority, TaskType, worker
-from .track_generator import generate_all, regenerate_track, repaint_track
+from .track_generator import generate_all, generate_separated, regenerate_track, repaint_track
 
 
 app = FastAPI(title="AI Composer", version="2.8")
@@ -188,6 +188,23 @@ async def generate_all_route(req: SessionRequest):
             "sse_queue": sse_queue,
         },
         generate_all,
+    )
+    return StreamingResponse(_stream_job(sse_queue, {"done"}), media_type="text/event-stream")
+
+
+@app.post("/generate/separated", dependencies=[Depends(require_api_key)])
+async def generate_separated_route(req: SessionRequest):
+    # Compose a full mix, then split it into stems with Demucs. HEAVY work.
+    session = await db.get_session(req.session_id)
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    sse_queue: asyncio.Queue = asyncio.Queue()
+    await sse_queue.put({"type": "queue", **worker.counts(), "message": "Queued stem separation"})
+    await worker.enqueue(
+        Priority.HEAVY,
+        TaskType.SEPARATE,
+        {"session_id": req.session_id, "sse_queue": sse_queue},
+        generate_separated,
     )
     return StreamingResponse(_stream_job(sse_queue, {"done"}), media_type="text/event-stream")
 

@@ -3,10 +3,21 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
+from pathlib import Path
 
-from . import ace_client, db
+from . import ace_client, db, stem_separator
 from .config import OUTPUTS_DIR
-from .prompt_builder import build_caption
+from .prompt_builder import build_caption, build_master_caption
+
+
+# Korean display names for the 4 htdemucs stems.
+_STEM_LABELS = {
+    "drums": "드럼",
+    "bass": "베이스",
+    "other": "기타/멜로디",
+    "vocals": "보컬",
+}
 
 
 def _sse(event_type: str, **kwargs) -> dict:
@@ -109,6 +120,80 @@ async def generate_all(
             message=(" | ".join(failures) if failures else "OK"),
             tracks=await db.get_tracks(session_id),
         ))
+
+
+async def generate_separated(
+    session_id: str,
+    sse_queue: asyncio.Queue,
+) -> None:
+    """Generate one full-band track, then split it into stems with Demucs.
+
+    HEAVY queue task. Replaces the planned track list with the real stems
+    (drums / bass / other) so the existing mixer, waveform and repaint routes
+    keep working unchanged on track_{order}.wav files.
+    """
+    await db.update_session_status(session_id, "generating")
+    session = await db.get_session(session_id)
+    tracks = await db.get_tracks(session_id)
+
+    global_bpm = session["bpm"] or 90
+    global_key = session["key"] or "C major"
+    duration = session["duration"]
+    caption = build_master_caption(tracks, global_bpm, global_key)
+
+    out_dir = Path(OUTPUTS_DIR) / session_id
+    source_path = str(out_dir / "_source.wav")
+
+    # Step 1 — generate the full mix from text.
+    await sse_queue.put(_sse("progress", phase="compose", percent=10, message="전체 곡 생성 중"))
+    try:
+        await ace_client.text2music(caption, duration, source_path)
+    except Exception as e:
+        await db.update_session_status(session_id, "error")
+        await sse_queue.put(_sse(
+            "done", percent=100, status="error",
+            message=f"곡 생성 실패: {type(e).__name__}: {e}",
+            tracks=await db.get_tracks(session_id),
+        ))
+        return
+
+    # Step 2 — separate into stems.
+    await sse_queue.put(_sse("progress", phase="separate", percent=50, message="스템 분리 중 (Demucs)"))
+    try:
+        stems = await stem_separator.separate(source_path, str(out_dir / "_stems"))
+    except Exception as e:
+        await db.update_session_status(session_id, "error")
+        await sse_queue.put(_sse(
+            "done", percent=100, status="error",
+            message=f"스템 분리 실패: {type(e).__name__}: {e}",
+            tracks=await db.get_tracks(session_id),
+        ))
+        return
+
+    # Step 3 — register each stem as a track (replaces the planned list).
+    await db.clear_tracks(session_id)
+    new_tracks = [
+        {
+            "track_order": idx,
+            "name": _STEM_LABELS.get(stem["stem"], stem["stem"]),
+            "instrument": stem["stem"],
+            "caption": caption,
+            "locked": 1,
+            "volume": 1.0,
+        }
+        for idx, stem in enumerate(stems, start=1)
+    ]
+    await db.create_tracks(session_id, new_tracks)
+    for idx, stem in enumerate(stems, start=1):
+        dest = _wav_path(session_id, idx)
+        shutil.copyfile(stem["path"], dest)
+        await db.update_track_wav(session_id, idx, f"/outputs/{session_id}/track_{idx}.wav")
+
+    await db.update_session_status(session_id, "done")
+    await sse_queue.put(_sse(
+        "done", percent=100, status="done",
+        message="스템 분리 완료", tracks=await db.get_tracks(session_id),
+    ))
 
 
 async def regenerate_track(

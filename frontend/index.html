@@ -282,6 +282,7 @@
         <div class="progress hidden" id="progressWrap1"><div id="progressBar1" class="bar"></div></div>
         <p id="progressText1" class="progress-text"></p>
         <button id="generateBtn" class="warn btn-full">🎼 생성 시작</button>
+        <button id="separateBtn" class="secondary btn-full">🎚 스템 분리 생성 (Demucs)</button>
       </div>
     </div>
   </section>
@@ -479,13 +480,14 @@
   }
 
   /* ── Generate all (공통 로직) ── */
-  async function generateAll(barId, textId, wrapId, genBtnId, onDone) {
+  async function generateAll(barId, textId, wrapId, genBtnId, onDone, endpoint = "/generate/all") {
     $(genBtnId).disabled = true;
     const isModal = genBtnId === "modalGenerateBtn";
     const statusId = isModal ? "modalPlanStatus" : "planStatus";
-    $(statusId).textContent = "트랙 생성 중... (수 분 소요)";
+    const isSep = endpoint === "/generate/separated";
+    $(statusId).textContent = isSep ? "전체 곡 생성 + 스템 분리 중... (수 분 소요)" : "트랙 생성 중... (수 분 소요)";
     $(statusId).style.color = "";
-    const res = await api("/generate/all", {
+    const res = await api(endpoint, {
       method: "POST",
       body: JSON.stringify({ session_id: sessionId })
     });
@@ -586,6 +588,14 @@
       showPage("daw");
       await renderTracks();
     });
+  });
+
+  /* Page 1 스템 분리 생성 (전체 곡 1개 생성 → Demucs 분리) */
+  $("separateBtn").addEventListener("click", () => {
+    generateAll("progressBar1", "progressText1", "progressWrap1", "separateBtn", async () => {
+      showPage("daw");
+      await renderTracks();
+    }, "/generate/separated");
   });
 
   /* 새 기획 버튼 → 세션 초기화 + Plan 페이지로 */
