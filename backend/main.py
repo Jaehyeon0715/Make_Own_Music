@@ -108,7 +108,14 @@ async def shutdown() -> None:
 async def index():
     index_path = FRONTEND_DIR / "index.html"
     if index_path.exists():
-        return FileResponse(index_path)
+        return FileResponse(
+            index_path,
+            headers={
+                "Cache-Control": "no-cache, no-store, must-revalidate",
+                "Pragma": "no-cache",
+                "Expires": "0",
+            },
+        )
     return {"message": "AI Composer backend is running"}
 
 

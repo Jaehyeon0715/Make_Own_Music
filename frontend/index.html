@@ -292,6 +292,7 @@
       <div class="daw-header">
         <h2>DAW 편집</h2>
         <div class="row">
+          <button id="newSessionBtn" class="secondary">새 기획</button>
           <button id="editPlanBtn" class="secondary">기획 수정</button>
           <button id="mixBtn">믹스 만들기</button>
           <a id="mixLink" class="status" href="#" download style="font-size:13px"></a>
@@ -585,6 +586,20 @@
       showPage("daw");
       await renderTracks();
     });
+  });
+
+  /* 새 기획 버튼 → 세션 초기화 + Plan 페이지로 */
+  $("newSessionBtn").addEventListener("click", () => {
+    if (!confirm("현재 세션을 두고 새 기획을 시작합니다. 계속하시겠어요?")) return;
+    localStorage.removeItem("session_id");
+    sessionId = "";
+    setSession("");
+    // 이전 결과 영역 초기화
+    $("planResult").classList.add("hidden");
+    $("planForm").reset();
+    $("planStatus").textContent = "";
+    $("planLoading").classList.add("hidden");
+    showPage("plan");
   });
 
   /* 기획 수정 버튼 → modal open */
