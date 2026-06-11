@@ -22,7 +22,7 @@ from .queue_worker import Priority, TaskType, worker
 from .track_generator import generate_all, generate_separated, regenerate_track, repaint_track
 
 
-app = FastAPI(title="AI Composer", version="2.8")
+app = FastAPI(title="MOM", version="2.8")
 configure_cors(app)
 
 # Serve generated audio directly from /outputs.
@@ -116,7 +116,7 @@ async def index():
                 "Expires": "0",
             },
         )
-    return {"message": "AI Composer backend is running"}
+    return {"message": "MOM backend is running"}
 
 
 @app.get("/health")

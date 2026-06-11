@@ -64,7 +64,7 @@ class TrayController:
         self.status_text = text
         if self.icon:
             self.icon.icon = _make_icon(state)
-            self.icon.title = f"AI Composer — {text}"
+            self.icon.title = f"MOM — {text}"
             self.icon.update_menu()
 
     # ── Startup sequence ──
@@ -139,7 +139,7 @@ class TrayController:
         self.icon = pystray.Icon(
             "ai_composer",
             _make_icon("loading"),
-            title="AI Composer — 초기화 중...",
+            title="MOM — 초기화 중...",
             menu=self.build_menu(),
         )
         self._startup_thread = threading.Thread(target=self.startup_sequence, daemon=True)
