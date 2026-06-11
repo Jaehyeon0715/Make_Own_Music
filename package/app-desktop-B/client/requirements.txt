@@ -1,0 +1,8 @@
+# Thin client (.exe) deps - this PC. No torch/ACE-Step here.
+pywebview>=5.0      # Desktop window (Windows: uses WebView2 runtime)
+requests>=2.31      # Health-check polling
+# Optional tray icon
+pystray>=0.19
+Pillow>=10.0
+# Build
+pyinstaller>=6.0

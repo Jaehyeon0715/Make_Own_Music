@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>MOM — 연결 설정</title>
+<style>
+  :root { --bg:#f6f4ef; --ink:#202124; --muted:#6f6a61; --line:#d8d1c4; --accent:#287c74; --warn:#b44932; --panel:#fffdf8; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:"Segoe UI",system-ui,sans-serif; background:var(--bg); color:var(--ink); }
+  .wrap { max-width:460px; margin:32px auto; padding:0 18px; }
+  h1 { font-size:18px; margin:0 0 4px; }
+  p.sub { color:var(--muted); font-size:13px; margin:0 0 20px; }
+  .card { background:var(--panel); border:1px solid var(--line); border-radius:10px; padding:22px 20px; }
+  label { display:block; font-size:13px; color:var(--muted); margin:14px 0 6px; }
+  input { width:100%; padding:10px 11px; border:1px solid var(--line); border-radius:6px; font:inherit; background:#fff; color:var(--ink); }
+  .row { display:flex; gap:10px; }
+  .row > div { flex:1; }
+  .btns { display:flex; gap:8px; margin-top:18px; }
+  button { flex:1; border:0; border-radius:6px; padding:11px; font:inherit; font-weight:700; cursor:pointer; }
+  .primary { background:var(--accent); color:#fff; }
+  .ghost { background:#e7e0d3; color:var(--ink); }
+  button:disabled { opacity:.5; cursor:wait; }
+  .status { margin-top:14px; font-size:13px; min-height:18px; }
+  .ok { color:var(--accent); } .err { color:var(--warn); }
+  .hint { font-size:12px; color:var(--muted); margin-top:6px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>GPU PC 연결</h1>
+  <p class="sub">음악 생성을 담당하는 GPU PC 주소를 입력하세요.</p>
+  <div class="card">
+    <div class="row">
+      <div style="flex:2">
+        <label>GPU PC 주소 (LAN IP 또는 Tailscale 100.x)</label>
+        <input id="host" placeholder="예: 192.168.0.50" />
+      </div>
+      <div style="flex:1">
+        <label>포트</label>
+        <input id="port" type="number" value="8080" />
+      </div>
+    </div>
+
+    <label>MAC 주소 (선택 — Wake-on-LAN용)</label>
+    <input id="mac" placeholder="예: AA:BB:CC:DD:EE:FF" />
+    <div class="hint">같은 LAN에서만 원격 기상 가능. GPU PC BIOS에서 WoL 활성 필요.</div>
+
+    <div class="btns">
+      <button class="ghost" id="wakeBtn">GPU PC 깨우기</button>
+      <button class="primary" id="connectBtn">연결</button>
+    </div>
+    <div class="status" id="status"></div>
+  </div>
+</div>
+
+<script>
+  const $ = id => document.getElementById(id);
+  const setStatus = (msg, cls="") => { const s=$("status"); s.textContent=msg; s.className="status "+cls; };
+
+  async function ready() {
+    // Wait until the pywebview API is ready
+    while (!(window.pywebview && window.pywebview.api)) await new Promise(r => setTimeout(r, 50));
+    const cfg = await window.pywebview.api.get_config();
+    $("host").value = cfg.gpu_host || "";
+    $("port").value = cfg.port || 8080;
+    $("mac").value  = cfg.mac || "";
+  }
+
+  $("connectBtn").addEventListener("click", async () => {
+    const host=$("host").value.trim(), port=$("port").value, mac=$("mac").value.trim();
+    if (!host) { setStatus("주소를 입력하세요", "err"); return; }
+    $("connectBtn").disabled = true;
+    setStatus("연결 확인 중...");
+    const res = await window.pywebview.api.save_and_open(host, port, mac);
+    if (res.ok) setStatus("연결됨 — 앱을 엽니다", "ok");
+    else { setStatus("⚠ " + res.msg, "err"); $("connectBtn").disabled = false; }
+  });
+
+  $("wakeBtn").addEventListener("click", async () => {
+    const mac=$("mac").value.trim();
+    setStatus("매직패킷 전송 중...");
+    const res = await window.pywebview.api.wake(mac);
+    setStatus((res.ok ? "✓ " : "⚠ ") + res.msg, res.ok ? "ok" : "err");
+  });
+
+  ready();
+</script>
+</body>
+</html>
